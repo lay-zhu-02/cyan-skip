@@ -28,6 +28,6 @@
 
 ## 网站下载入口
 
-layz.top 服务器每 5 分钟自动检查最新稳定 Release，下载 APK 与 `.sha256` 并校验大小和 SHA-256；成功后原子切换当前下载，失败时保留最近一次成功版本。用户通过 `https://layz.top/downloads/cyan-skip.apk` 直接下载，不需要访问 GitHub；配套校验文件位于 `https://layz.top/downloads/cyan-skip.apk.sha256`。网站 `/jump` 显示实际同步版本，同时保留 GitHub Release 备用链接。发布新 Release 无需重新部署网站或手工上传安装包。同步服务源码和运维命令位于网站仓库 `ops/RELEASE-MIRROR.md`。
+用户每次点击本站 APK 下载时，layz.top 服务器检查最新稳定 Release（无定时同步），下载 APK 与 `.sha256` 并校验大小和 SHA-256；成功后原子切换当前下载，失败时保留最近一次成功版本。用户通过 `https://layz.top/downloads/cyan-skip.apk` 直接下载，不需要访问 GitHub；配套校验文件位于 `https://layz.top/downloads/cyan-skip.apk.sha256`。网站 `/jump` 显示实际同步版本，同时保留 GitHub Release 备用链接。发布新 Release 无需重新部署网站或手工上传安装包。同步服务源码和运维命令位于网站仓库 `ops/RELEASE-MIRROR.md`。
 
 首次 Release 成功发布并验证 APK 可下载后，再部署网站入口。若最终使用其他仓库，同步修改网站链接与本页地址。
