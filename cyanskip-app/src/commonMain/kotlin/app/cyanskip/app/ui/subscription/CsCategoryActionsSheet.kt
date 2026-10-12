@@ -1,0 +1,262 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
+import app.cyanskip.app.resources.Res
+import app.cyanskip.app.resources.action_clear
+import app.cyanskip.app.resources.category_custom
+import app.cyanskip.app.resources.category_delete
+import app.cyanskip.app.resources.category_disabled_description
+import app.cyanskip.app.resources.category_edit
+import app.cyanskip.app.resources.category_enabled_description
+import app.cyanskip.app.resources.category_follow_subscription
+import app.cyanskip.app.resources.category_follow_subscription_disabled
+import app.cyanskip.app.resources.category_follow_subscription_enabled
+import app.cyanskip.app.resources.category_follow_subscription_unspecified
+import app.cyanskip.app.resources.category_override_count
+import app.cyanskip.app.resources.category_override_unaffected
+import app.cyanskip.app.resources.category_use_group_default
+import app.cyanskip.app.resources.category_use_group_default_description
+import app.cyanskip.app.rule.CategorySetting
+import app.cyanskip.app.subscription.RawSubscription
+import app.cyanskip.app.ui.component.CsIcon
+import app.cyanskip.app.ui.component.CsIconButton
+import app.cyanskip.app.ui.component.CsIcons
+import app.cyanskip.app.ui.component.CsRulePropertyIcon
+import app.cyanskip.app.ui.component.CsRuleSettingsSheet
+import app.cyanskip.app.ui.component.CsSwitch
+import app.cyanskip.app.ui.component.RuleProperty
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun CsCategoryActionsSheet(
+    category: RawSubscription.RawCategory,
+    setting: CategorySetting,
+    overrideCount: Int,
+    editable: Boolean,
+    busy: Boolean,
+    onDismissRequest: () -> Unit,
+    onSetting: (CategorySetting) -> Unit,
+    onClearOverrides: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    CsRuleSettingsSheet(
+        title = category.name,
+        headerBottomPadding = 0.dp,
+        subtitleContent = {
+            Column(
+                Modifier.fillMaxWidth().animateContentSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                category.desc?.takeIf { it.isNotBlank() }?.let { description ->
+                    Text(
+                        description, style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (overrideCount > 0) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ),
+                    ) {
+                        Row(
+                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CsRulePropertyIcon(
+                                property = RuleProperty.CustomSetting,
+                                modifier = Modifier.padding(end = 12.dp).size(24.dp),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Column(
+                                Modifier.weight(1f).padding(end = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    stringResource(
+                                        Res.string.category_override_count,
+                                        overrideCount
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    stringResource(Res.string.category_override_unaffected),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            TextButton(
+                                enabled = !busy,
+                                onClick = onClearOverrides,
+                                modifier = Modifier.size(width = 56.dp, height = 48.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp),
+                            ) {
+                                Text(stringResource(Res.string.action_clear))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        onDismissRequest = onDismissRequest,
+    ) {
+        CategoryDefaultContent(category, setting, onSetting)
+        if (editable) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                CsIconButton(
+                    imageVector = CsIcons.Edit,
+                    contentDescription = stringResource(Res.string.category_edit),
+                    onClick = onEdit,
+                )
+                CsIconButton(
+                    imageVector = CsIcons.Delete,
+                    contentDescription = stringResource(Res.string.category_delete),
+                    onClick = onDelete,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryDefaultContent(
+    category: RawSubscription.RawCategory,
+    setting: CategorySetting,
+    onSelect: (CategorySetting) -> Unit,
+) {
+    val subscriptionDefault = when (category.enable) {
+        true -> stringResource(Res.string.category_follow_subscription_enabled)
+        false -> stringResource(Res.string.category_follow_subscription_disabled)
+        null -> stringResource(Res.string.category_follow_subscription_unspecified)
+    }
+    val customSelected = setting == CategorySetting.Enabled || setting == CategorySetting.Disabled
+    val customEnabled = when (setting) {
+        CategorySetting.Enabled -> true
+        CategorySetting.Disabled -> false
+        CategorySetting.FollowSubscription -> category.enable ?: true
+        CategorySetting.GroupDefault -> true
+    }
+    Column(Modifier.selectableGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        CategoryChoice.entries.forEach { choice ->
+            val selected = when (choice) {
+                CategoryChoice.Subscription -> setting == CategorySetting.FollowSubscription
+                CategoryChoice.Custom -> customSelected
+                CategoryChoice.GroupDefault -> setting == CategorySetting.GroupDefault
+            }
+            val label = when (choice) {
+                CategoryChoice.Subscription -> stringResource(Res.string.category_follow_subscription)
+                CategoryChoice.Custom -> stringResource(Res.string.category_custom)
+                CategoryChoice.GroupDefault -> stringResource(Res.string.category_use_group_default)
+            }
+            val description = when (choice) {
+                CategoryChoice.Subscription -> subscriptionDefault
+                CategoryChoice.Custom -> if (customEnabled) stringResource(Res.string.category_enabled_description) else stringResource(
+                    Res.string.category_disabled_description
+                )
+
+                CategoryChoice.GroupDefault -> stringResource(Res.string.category_use_group_default_description)
+            }
+            val interaction = if (choice == CategoryChoice.Custom && customSelected) {
+                Modifier.toggleable(value = customEnabled, role = Role.Switch, onValueChange = {
+                    onSelect(if (it) CategorySetting.Enabled else CategorySetting.Disabled)
+                })
+            } else {
+                Modifier.selectable(selected = selected, role = Role.RadioButton, onClick = {
+                    onSelect(
+                        when (choice) {
+                            CategoryChoice.Subscription -> CategorySetting.FollowSubscription
+                            CategoryChoice.Custom -> if (customEnabled) CategorySetting.Enabled else CategorySetting.Disabled
+                            CategoryChoice.GroupDefault -> CategorySetting.GroupDefault
+                        }
+                    )
+                })
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh,
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().then(interaction)
+                        .heightIn(min = 72.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(
+                        Modifier.weight(1f).padding(end = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val iconSetting = when (choice) {
+                                CategoryChoice.Subscription -> CategorySetting.FollowSubscription
+                                CategoryChoice.Custom -> if (customEnabled) CategorySetting.Enabled else CategorySetting.Disabled
+                                CategoryChoice.GroupDefault -> CategorySetting.GroupDefault
+                            }
+                            CsIcon(
+                                imageVector = iconSetting.icon,
+                                animateMorph = choice == CategoryChoice.Custom,
+                                modifier = Modifier.size(20.dp),
+                                contentDescription = null,
+                                tint = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(label, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        Text(
+                            description, style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Box(
+                        Modifier.size(width = 56.dp, height = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (choice == CategoryChoice.Custom) {
+                            CsSwitch(
+                                checked = customEnabled, onCheckedChange = null,
+                                enabled = customSelected
+                            )
+                        } else {
+                            RadioButton(selected = selected, onClick = null)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum class CategoryChoice { Subscription, Custom, GroupDefault }

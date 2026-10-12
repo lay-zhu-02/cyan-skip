@@ -11,13 +11,11 @@ export type Adb = (...args: string[]) => Promise<Buffer>;
 export interface CaptureOptions {
   serial?: string; apps?: string; font: string; install: boolean; screens: boolean; output: string;
 }
-const packageName = 'li.songe.gkd.debug';
+const packageName = 'app.cyanskip.android.debug';
 const remote = `/sdcard/Android/data/${packageName}/files`;
 const storePath = `${remote}/store/store.json`;
-// Persisted Android settings protocol; must match AutomatorMode.A11y.value.
-const a11yAutomatorMode = 1;
-const automationKeys = ['enableAutomator', 'automatorMode'] as const;
-const mainActivity = `${packageName}/li.gkd.app.MainActivity`;
+const matchingKeys = ['enableMatch'] as const;
+const mainActivity = `${packageName}/app.cyanskip.app.MainActivity`;
 
 function command(args: string[], timeout = 45_000, signal?: AbortSignal) {
   const child = spawn('adb', args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], signal });
@@ -50,38 +48,38 @@ async function writeStore(adb: Adb, value: Store) {
   } finally { await rm(folder, { recursive: true, force: true }); }
 }
 
-/** Only the two temporarily changed fields are restored into the latest device store. */
-export async function withAutomationPaused<T>(adb: Adb, output: string, work: (original: Store) => Promise<T>): Promise<T> {
+/** Only the temporarily changed field are restored into the latest device store. */
+export async function withMatchingPaused<T>(adb: Adb, output: string, work: (original: Store) => Promise<T>): Promise<T> {
   const original = await readStore(adb);
-  const saved = Object.fromEntries(automationKeys.filter(k => Object.hasOwn(original, k)).map(k => [k, original[k]]));
-  const recovery = join(output, 'automation-recovery.json');
+  const saved = Object.fromEntries(matchingKeys.filter(k => Object.hasOwn(original, k)).map(k => [k, original[k]]));
+  const recovery = join(output, 'matching-recovery.json');
   // Exclusive creation prevents overwriting an unfinished previous recovery record.
   await writeFile(recovery, JSON.stringify(saved), { flag: 'wx' });
   let workError: unknown;
   try {
     await adb('shell', 'am', 'force-stop', packageName);
-    await writeStore(adb, { ...await readStore(adb), enableAutomator: false, automatorMode: a11yAutomatorMode });
+    await writeStore(adb, { ...await readStore(adb), enableMatch: false });
     const paused = await readStore(adb);
-    if (paused.enableAutomator !== false || paused.automatorMode !== a11yAutomatorMode) throw new Error('Automation preflight did not take effect');
+    if (paused.enableMatch !== false) throw new Error('Matching preflight did not take effect');
     return await work(original);
   } catch (error) { workError = error; throw error; }
   finally {
     try {
       await adb('shell', 'am', 'force-stop', packageName);
       const latest = await readStore(adb);
-      for (const key of automationKeys) {
+      for (const key of matchingKeys) {
         if (Object.hasOwn(saved, key)) latest[key] = saved[key]; else delete latest[key];
       }
       await writeStore(adb, latest);
       const restored = await readStore(adb);
-      for (const key of automationKeys) {
+      for (const key of matchingKeys) {
         if (Object.hasOwn(saved, key) !== Object.hasOwn(restored, key) || saved[key] !== restored[key]) throw new Error(`Restore mismatch: ${key}`);
       }
       await adb('shell', 'am', 'start', '-n', mainActivity);
       await unlink(recovery);
-      console.log('Restored and verified original automation switch and mode.');
+      console.log('Restored and verified original matching switch.');
     } catch (error) {
-      throw new AggregateError([...(workError === undefined ? [] : [workError]), error], `Automation recovery required: ${recovery}`);
+      throw new AggregateError([...(workError === undefined ? [] : [workError]), error], `Matching recovery required: ${recovery}`);
     }
   }
 }
@@ -98,19 +96,19 @@ export async function captureProfile(options: CaptureOptions, repo: string) {
   const check = () => cancellation.signal.throwIfAborted();
   const pause = (ms: number) => delay(ms, undefined, { signal: cancellation.signal });
   try {
-    await withAutomationPaused(adb, options.output, async () => {
+    await withMatchingPaused(adb, options.output, async () => {
       check();
       if (options.install) {
-        const folder = join(repo, 'gkd-android/build/outputs/apk/gkd/debug');
+        const folder = join(repo, 'cyanskip-android/build/outputs/apk/debug');
         const apks = (await readdir(folder)).filter(n => n.endsWith('.apk'));
-        if (apks.length !== 1) throw new Error(`Build gkdDebug first: expected one APK in ${folder}`);
+        if (apks.length !== 1) throw new Error(`Build the debug APK first: expected one APK in ${folder}`);
         await adb('install', '-r', '-t', join(folder, apks[0]!)); check();
       }
       const current = await readStore(adb);
-      if (current.enableAutomator !== false || current.automatorMode !== a11yAutomatorMode) throw new Error('Automation must remain disabled before export');
+      if (current.enableMatch !== false) throw new Error('Matching must remain disabled before export');
       const id = randomUUID();
       const request = `${remote}/development/desktop-profile/${id}`;
-      await adb('shell', 'am', 'start', '-n', mainActivity, '-a', 'li.gkd.action.EXPORT_DESKTOP_PROFILE', '--es', 'requestId', id);
+      await adb('shell', 'am', 'start', '-n', mainActivity, '-a', 'app.cyanskip.action.EXPORT_DESKTOP_PROFILE', '--es', 'requestId', id);
       let complete = false;
       for (let i = 0; i < 300; i++) {
         check();
@@ -142,10 +140,10 @@ export async function captureProfile(options: CaptureOptions, repo: string) {
         if (policy.includes('showing=true') || policy.includes('mIsShowing=true')) throw new Error('Unlock the device before taking screenshots');
         for (const [tab, page] of ['dashboard', 'subscriptions', 'apps', 'settings'].entries()) {
           check();
-          await adb('shell', 'am', 'start', '-n', `${packageName}/li.gkd.app.entry.OpenSchemeActivity`, '-a', 'android.intent.action.VIEW', '-d', `gkd://page?tab=${tab}`);
+          await adb('shell', 'am', 'start', '-n', `${packageName}/app.cyanskip.app.entry.OpenSchemeActivity`, '-a', 'android.intent.action.VIEW', '-d', `cyanskip://page?tab=${tab}`);
           await pause(1000);
           const focus = (await adb('shell', 'dumpsys', 'window')).toString();
-          if (!focus.split('\n').some(line => line.includes('mCurrentFocus=') && line.includes(packageName))) throw new Error('GKD is not the foreground window');
+          if (!focus.split('\n').some(line => line.includes('mCurrentFocus=') && line.includes(packageName))) throw new Error('cyan-skip is not the foreground window');
           await writeFile(join(staging, `android-${page}.png`), await adb('exec-out', 'screencap', '-p'));
         }
       }

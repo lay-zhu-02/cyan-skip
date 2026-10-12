@@ -1,0 +1,6 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="@color/ic_launcher_foreground_tint"
+        android:pathData="M34,32 L61,54 L34,76 L34,64 L47,54 L34,44 Z M65,33 L74,33 L74,75 L65,75 Z" />
+</vector>

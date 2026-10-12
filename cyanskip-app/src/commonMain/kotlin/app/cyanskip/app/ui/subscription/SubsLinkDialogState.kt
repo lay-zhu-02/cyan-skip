@@ -1,0 +1,196 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlin.coroutines.resume
+import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import app.cyanskip.app.network.AppLinks
+import app.cyanskip.app.network.LocalNetworkUrls
+import app.cyanskip.app.permission.AppPermission
+import app.cyanskip.app.permission.PermissionRequester
+import app.cyanskip.app.resources.Res
+import app.cyanskip.app.resources.action_cancel
+import app.cyanskip.app.resources.action_copy
+import app.cyanskip.app.resources.action_ok
+import app.cyanskip.app.resources.action_save
+import app.cyanskip.app.resources.link_invalid
+import app.cyanskip.app.resources.subscription_add
+import app.cyanskip.app.resources.subscription_duplicate_link
+import app.cyanskip.app.resources.subscription_link
+import app.cyanskip.app.resources.subscription_help
+import app.cyanskip.app.resources.subscription_link_input_hint
+import app.cyanskip.app.subscription.SubscriptionRepository
+import app.cyanskip.app.ui.component.CsAlertDialog
+import app.cyanskip.app.ui.component.CsIconButton
+import app.cyanskip.app.ui.component.CsIcons
+import app.cyanskip.app.ui.component.autoFocus
+import app.cyanskip.app.ui.navigation.AppNavigator
+import app.cyanskip.app.ui.text.getSync
+import app.cyanskip.app.util.ToastUtils
+import app.cyanskip.app.util.copyText
+import org.jetbrains.compose.resources.stringResource
+
+private data class SubsLinkDialogRequest(
+    val initialValue: String,
+    val existingUrls: Set<String>,
+    val value: String,
+)
+
+class SubsLinkDialogState(
+    private val navigator: AppNavigator,
+    private val permissions: PermissionRequester,
+) {
+    private val requestFlow = MutableStateFlow<SubsLinkDialogRequest?>(null)
+    private val requestMutex = Mutex()
+    private var currentContinuation: CancellableContinuation<String?>? = null
+
+    private fun complete(value: String?) {
+        val continuation = currentContinuation ?: return
+        if (continuation.isActive) {
+            requestFlow.value = null
+            continuation.resume(value)
+        }
+    }
+
+    private fun updateValue(value: String) {
+        val request = requestFlow.value ?: return
+        requestFlow.value = request.copy(value = value.trim())
+    }
+
+    private fun submit(request: SubsLinkDialogRequest) {
+        val value = request.value
+        if (!LocalNetworkUrls.isNetworkUrl(value)) {
+            ToastUtils.show(Res.string.link_invalid.getSync())
+            return
+        }
+        if (value in request.existingUrls) {
+            ToastUtils.show(Res.string.subscription_duplicate_link.getSync())
+            return
+        }
+        complete(value)
+    }
+
+    private fun cancel() = complete(null)
+
+    private fun openHelp() {
+        cancel()
+        navigator.openWebPage(AppLinks.SubscriptionHelp)
+    }
+
+    suspend fun request(initialValue: String = ""): String? {
+        val existingUrls = withContext(Dispatchers.IO) {
+            SubscriptionRepository.existingUpdateUrls()
+        }
+        val value = withContext(Dispatchers.Main.immediate) {
+            requestMutex.withLock {
+                try {
+                    requestFlow.value = SubsLinkDialogRequest(
+                        initialValue = initialValue,
+                        existingUrls = existingUrls,
+                        value = initialValue,
+                    )
+                    suspendCancellableCoroutine { continuation ->
+                        currentContinuation = continuation
+                    }
+                } finally {
+                    currentContinuation = null
+                    requestFlow.value = null
+                }
+            }
+        }
+        if (initialValue.isEmpty() && value != null && LocalNetworkUrls.isLocalNetworkUrl(value) && !permissions.ensurePermissions(AppPermission.LocalNetwork)) {
+            return null
+        }
+        return value
+    }
+
+    @Composable
+    fun Render() {
+        val request by requestFlow.collectAsStateWithLifecycle()
+        val currentRequest = request
+        if (currentRequest != null) {
+            val editing = currentRequest.initialValue.isNotEmpty()
+            CsAlertDialog(
+                properties = DialogProperties(dismissOnClickOutside = false),
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            text = if (editing) {
+                                stringResource(Res.string.subscription_link)
+                            } else {
+                                stringResource(Res.string.subscription_add)
+                            },
+                        )
+                        CsIconButton(
+                            imageVector = CsIcons.HelpOutline,
+                            contentDescription = stringResource(Res.string.subscription_help),
+                            onClick = ::openHelp,
+                        )
+                    }
+                },
+                text = {
+                    OutlinedTextField(
+                        value = currentRequest.value,
+                        onValueChange = ::updateValue,
+                        maxLines = 8,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (editing) Modifier else Modifier.autoFocus()),
+                        placeholder = {
+                            Text(text = stringResource(Res.string.subscription_link_input_hint))
+                        },
+                        isError = currentRequest.value.isNotEmpty() &&
+                                !LocalNetworkUrls.isNetworkUrl(currentRequest.value),
+                    )
+                },
+                onDismissRequest = ::cancel,
+                confirmButton = {
+                    TextButton(
+                        enabled = currentRequest.value.isNotEmpty() &&
+                                currentRequest.value != currentRequest.initialValue,
+                        onClick = {
+                            submit(currentRequest)
+                        },
+                    ) {
+                        Text(text = stringResource(if (editing) Res.string.action_save else Res.string.action_ok))
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        if (editing) {
+                            TextButton(
+                                enabled = currentRequest.value.isNotEmpty(),
+                                onClick = { copyText(currentRequest.value) },
+                            ) {
+                                Text(text = stringResource(Res.string.action_copy))
+                            }
+                        }
+                        TextButton(onClick = ::cancel) {
+                            Text(text = stringResource(Res.string.action_cancel))
+                        }
+                    }
+                },
+            )
+        }
+    }
+}

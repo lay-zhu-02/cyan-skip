@@ -1,0 +1,454 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import app.cyanskip.app.resources.lite_edit_subscription_link
+import app.cyanskip.app.resources.lite_source_help
+import app.cyanskip.app.resources.lite_source_history
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import app.cyanskip.app.resources.Res
+import app.cyanskip.app.resources.subscription_update_failed
+import app.cyanskip.app.resources.subscription_update_error_dismiss
+import app.cyanskip.app.resources.action_reload
+import app.cyanskip.app.resources.delete_named_confirmation
+import app.cyanskip.app.resources.subscription_load_failed
+import app.cyanskip.app.resources.none_available
+import app.cyanskip.app.resources.rule_categories
+import app.cyanskip.app.resources.rule_categories_view_list
+import app.cyanskip.app.resources.subscription_categories_count
+import app.cyanskip.app.resources.subscription_delete
+import app.cyanskip.app.resources.subscription_id_description
+import app.cyanskip.app.resources.subscription_metadata_description
+import app.cyanskip.app.resources.unknown
+import app.cyanskip.app.resources.update_time_description
+import app.cyanskip.app.resources.version_prefixed
+import app.cyanskip.app.state.Loadable
+import app.cyanskip.app.subscription.RawSubscription
+import app.cyanskip.app.subscription.SubscriptionRepository
+import app.cyanskip.app.time.format
+import app.cyanskip.app.ui.component.CsIcon
+import app.cyanskip.app.ui.component.CsIconButton
+import app.cyanskip.app.ui.component.CsIcons
+import app.cyanskip.app.ui.component.CsModalBottomSheet
+import app.cyanskip.app.ui.component.CsPageBottomSpace
+import app.cyanskip.app.ui.component.CsPageBottomSpaceDefaults
+import app.cyanskip.app.ui.component.CsRetainedSheet
+import app.cyanskip.app.ui.component.SheetRequest
+import app.cyanskip.app.ui.navigation.ActionLogRoute
+import app.cyanskip.app.ui.navigation.AppNavigator
+import app.cyanskip.app.ui.navigation.ConfirmDeletion
+import app.cyanskip.app.ui.settings.appVersion
+import app.cyanskip.app.ui.share.launchUi
+import app.cyanskip.app.ui.navigation.SubsCategoryRoute
+import app.cyanskip.app.ui.share.DeletionTarget
+import app.cyanskip.app.ui.style.itemHorizontalPadding
+import app.cyanskip.app.ui.text.formatTimeAgo
+import app.cyanskip.app.ui.text.getSync
+import app.cyanskip.app.ui.text.subscriptionMessageResource
+import app.cyanskip.app.util.ToastUtils
+import app.cyanskip.db.Db
+import app.cyanskip.db.LOCAL_SUBS_ID
+import app.cyanskip.db.SubsItem
+import org.jetbrains.compose.resources.stringResource
+
+private data class SubsSheetSnapshot(
+    val item: SubsItem,
+    val subscription: RawSubscription?,
+    val loading: Boolean,
+    val loadError: Exception?,
+    val updateError: Exception?,
+)
+
+class SubsSheetState(
+    private val navigator: AppNavigator,
+    private val openUrl: (String) -> Unit,
+    private val requestUrl: suspend (String) -> String?,
+    private val confirmDelete: ConfirmDeletion,
+) {
+    private val subsIdFlow = MutableStateFlow<SheetRequest<Long>?>(null)
+
+    fun show(subsId: Long) {
+        subsIdFlow.value = SheetRequest(subsId)
+    }
+
+    private fun dismiss(request: SheetRequest<Long>) {
+        if (subsIdFlow.value === request) subsIdFlow.value = null
+    }
+
+    fun dismissForDeletion(targets: Set<DeletionTarget>) {
+        val request = subsIdFlow.value ?: return
+        if (DeletionTarget.Subscription(request.key) in targets) dismiss(request)
+    }
+
+    @Composable
+    fun Render() {
+        val requested by subsIdFlow.collectAsStateWithLifecycle()
+        val subsItems by remember { Db.subsItemDao.query() }.collectAsStateWithLifecycle(emptyList())
+        val subscriptions by SubscriptionRepository.snapshotFlow.collectAsStateWithLifecycle()
+        val loading by SubscriptionRepository.updating.collectAsStateWithLifecycle()
+        val item = subsItems.find { it.id == requested?.key }
+        val data = subscriptions.value
+        val subscription = data?.subscriptions?.get(requested?.key)
+        CsRetainedSheet(
+            request = requested,
+            snapshot = if (item != null && subscriptions is Loadable.Ready) SubsSheetSnapshot(
+                item,
+                subscription,
+                loading,
+                data?.loadErrors?.get(item.id),
+                data?.updateErrors?.get(item.id),
+            ) else null,
+            missing = requested != null && subscriptions is Loadable.Ready && subscription == null &&
+                    data?.loadErrors?.containsKey(requested?.key) != true && data?.updateErrors?.containsKey(
+                requested?.key
+            ) != true,
+            onDismissRequest = ::dismiss,
+        ) { _, displayed, sheetState, dismiss ->
+            val subsItem = displayed.item
+            val subscription = displayed.subscription
+            val scope = rememberCoroutineScope()
+            val scrollState = rememberScrollState()
+            val sheetGesturesEnabled by remember {
+                derivedStateOf { scrollState.value == 0 }
+            }
+            CsModalBottomSheet(
+                onDismissRequest = dismiss,
+                sheetState = sheetState,
+                sheetGesturesEnabled = sheetGesturesEnabled,
+            ) {
+                val showName = subscription?.name ?: stringResource(
+                    Res.string.subscription_id_description,
+                    subsItem.id
+                )
+                val childModifier = remember {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = itemHorizontalPadding, vertical = 8.dp)
+                }
+                Column(
+                    modifier = Modifier
+                        .verticalScroll(
+                            state = scrollState,
+                        )
+                        .fillMaxWidth(),
+                ) {
+                    Text(
+                        text = showName,
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = childModifier
+                    )
+                    AnimatedSheetSection(displayed.loadError) { error ->
+                        SubsErrorCard(
+                            title = stringResource(Res.string.subscription_load_failed),
+                            error = error,
+                        ) {
+                            if (displayed.loading) {
+                                Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
+                            } else {
+                                CsIconButton(
+                                    imageVector = CsIcons.Autorenew,
+                                    contentDescription = stringResource(Res.string.action_reload),
+                                    onClick = {
+                                        scope.launchUi {
+                                            SubscriptionRepository.refresh(subsItem.id).message()
+                                                ?.let { ToastUtils.show(it) }
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    AnimatedSheetSection(displayed.updateError) { error ->
+                        SubsErrorCard(
+                            title = stringResource(Res.string.subscription_update_failed),
+                            error = error,
+                        ) {
+                            CsIconButton(
+                                imageVector = CsIcons.Close,
+                                contentDescription = stringResource(Res.string.subscription_update_error_dismiss),
+                                onClick = {
+                                    scope.launchUi {
+                                        SubscriptionRepository.dismissUpdateError(subsItem.id, error)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                    AnimatedSheetSection(subscription) { subscription ->
+                        val timeStr = formatTimeAgo(subsItem.mtime)
+                        val author = if (subsItem.isLocal) appVersion().appName else subscription.author
+                            ?: stringResource(Res.string.unknown)
+                        val metadataDescription = stringResource(
+                            Res.string.subscription_metadata_description,
+                            author, subscription.version, timeStr,
+                        )
+                        val timeDescription = stringResource(
+                            Res.string.update_time_description,
+                            subsItem.mtime.format("yyyy-MM-dd HH:mm:ss"),
+                        )
+                        val timeTooltipState = rememberTooltipState()
+                        val timeTooltipScope = rememberCoroutineScope()
+                        Row(
+                            modifier = childModifier.semantics(mergeDescendants = true) {
+                                contentDescription = metadataDescription
+                            },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Text(
+                                text = author,
+                                modifier = Modifier.weight(1f, fill = false),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = when {
+                                    subsItem.isLocal -> MaterialTheme.colorScheme.secondary
+                                    subscription.author == null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(
+                                        alpha = 0.5f
+                                    )
+
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                text = stringResource(
+                                    Res.string.version_prefixed,
+                                    subscription.version
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                            TooltipBox(
+                                tooltip = { PlainTooltip { Text(text = subsItem.mtime.format("yyyy-MM-dd HH:mm:ss")) } },
+                                state = timeTooltipState,
+                                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+                                    TooltipAnchorPosition.Above
+                                ),
+                            ) {
+                                Text(
+                                    text = timeStr,
+                                    modifier = Modifier
+                                        .clip(MaterialTheme.shapes.extraSmall)
+                                        .clickable {
+                                            timeTooltipScope.launch { timeTooltipState.show() }
+                                        }
+                                        .semantics {
+                                            contentDescription = timeDescription
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
+                            }
+                        }
+                        if (subscription.categories.isNotEmpty() || subsItem.isLocal) {
+                            SubsSheetItem(
+                                onClickLabel = stringResource(Res.string.rule_categories_view_list),
+                                onClick = click@{
+                                    dismiss()
+                                    navigator.navigate(SubsCategoryRoute(subsItem.id))
+                                },
+                            ) {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(Res.string.rule_categories),
+                                        style = MaterialTheme.typography.labelLarge,
+                                    )
+                                    Text(
+                                        text = if (subscription.categories.isNotEmpty()) stringResource(
+                                            Res.string.subscription_categories_count,
+                                            subscription.categories.size
+                                        ) else stringResource(Res.string.none_available),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.let {
+                                            if (subscription.categories.isEmpty()) {
+                                                it.copy(alpha = 0.5f)
+                                            } else {
+                                                it
+                                            }
+                                        },
+                                    )
+                                }
+                                CsIcon(
+                                    imageVector = CsIcons.KeyboardArrowRight,
+                                )
+                            }
+                        }
+                    }
+
+                    Column(modifier = childModifier) {
+                        val updateUrl = subsItem.updateUrl
+                        if (!subsItem.isLocal && updateUrl != null) {
+                            TextButton(onClick = {
+                                scope.launchUi {
+                                    val url = requestUrl(updateUrl) ?: return@launchUi
+                                    SubscriptionRepository.addOrModifyRemote(url, subsItem.id)
+                                        .message()?.let { ToastUtils.show(it) }
+                                }
+                            }) { Text(stringResource(Res.string.lite_edit_subscription_link)) }
+                        }
+                        if (!subsItem.isLocal && subscription?.supportUri != null) {
+                            TextButton(onClick = { openUrl(subscription.supportUri) }) {
+                                Text(stringResource(Res.string.lite_source_help))
+                            }
+                        }
+                        TextButton(onClick = {
+                            dismiss()
+                            navigator.navigate(ActionLogRoute(subsId = subsItem.id))
+                        }) { Text(stringResource(Res.string.lite_source_history)) }
+                        if (subsItem.id != LOCAL_SUBS_ID) {
+                            TextButton(onClick = {
+                                confirmDelete(
+                                    Res.string.subscription_delete.getSync(),
+                                    Res.string.delete_named_confirmation.getSync(subscription?.name ?: subsItem.id),
+                                    { setOf(DeletionTarget.Subscription(subsItem.id)) }, dismiss,
+                                ) {
+                                    val result = SubscriptionRepository.delete(subsItem.id)
+                                    result.message()?.let { ToastUtils.show(it) }
+                                }
+                            }) { Text(stringResource(Res.string.subscription_delete), color = MaterialTheme.colorScheme.error) }
+                        }
+                    }
+                    CsPageBottomSpace(height = CsPageBottomSpaceDefaults.CompactHeight)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.SubsErrorCard(
+    title: String,
+    error: Exception,
+    action: @Composable () -> Unit,
+) {
+    Spacer(Modifier.height(8.dp))
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = itemHorizontalPadding),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = error.subscriptionMessageResource(),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            action()
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}
+
+@Composable
+private fun <T : Any> AnimatedSheetSection(
+    value: T?,
+    content: @Composable ColumnScope.(T) -> Unit,
+) {
+    var retained by remember { mutableStateOf(value) }
+    if (value != null) {
+        SideEffect { retained = value }
+    }
+    AnimatedVisibility(
+        visible = value != null,
+        enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+        exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+    ) {
+        val displayed = value ?: retained
+        if (displayed != null) {
+            Column(Modifier.fillMaxWidth()) {
+                content(displayed)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubsSheetItem(
+    onClickLabel: String,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = itemHorizontalPadding, vertical = 4.dp)
+            .clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClickLabel = onClickLabel, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}

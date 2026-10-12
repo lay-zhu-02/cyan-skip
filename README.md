@@ -1,93 +1,60 @@
-# gkd
+# cyan-skip（青跳）
 
-<p align="center">
-<a href="https://gkd.li/"><img src="https://e.gkd.li/2a0a7787-f2dd-4529-a885-93f3b8c857c3" alt="GKD.LI" width="40%" /></a>
-</p>
+青跳（英文名 cyan-skip）是基于 [GKD](https://github.com/gkd-kit/gkd) 二次开发的独立 Android 精简版：只保留上游最核心的「按规则自动点击」和「页面快照」，并在此基础上提供**应用内自建规则**的可视化流程。
 
-基于 [高级选择器](https://gkd.li/guide/selector) + [订阅规则](https://gkd.li/guide/subscription) + [快照审查](https://github.com/gkd-kit/inspect) 的自定义屏幕点击 Android 应用
+- **自动点击**：按本地规则或订阅规则，在指定界面点击「跳过」「关闭」等目标；执行记录可在应用内查看。
+- **页面快照**：悬浮按钮抓取当前界面的节点树与截图，支持列表查看、预览、导出和删除。
+- **应用内自建规则**：打开一张快照，直接在截图上点选要点击的位置，应用自动挑选稳定的匹配条件并在快照上验证命中范围，确认动作与生效范围后保存成普通规则。整个过程不需要理解选择器语法或 JSON5，生成的规则仍是标准的应用规则组，可以在规则页继续启停和编辑。
+- **本地优先**：规则、订阅、快照和执行记录都保存在本机；不内置规则源，不自动上传。
+- **非商业项目**：仅供个人学习与自用，不提供商店分发、自动更新与商业支持。
 
-通过自定义规则，在指定界面，满足指定条件(如屏幕上存在特定文字)时，点击特定的节点或位置或执行其他操作
+## 用快照自建规则
 
-- **快捷操作**
+1. 首页开启无障碍服务，打开「功能开关」，并在快照页打开「快照按钮」。
+2. 切换到目标页面，点悬浮按钮抓一张快照。
+3. 在「快照」里打开这张快照，点右上角「生成规则」。
+4. 在截图上点一下要自动点击的位置：
+   - 双指缩放、单指拖动、双击放大或还原；贴边元素放大后也能拖到屏幕中间。
+   - 同一位置叠着多个可点元素时，面板会列出候选，点一下即可改选。
+   - 需要精确到某一层时，打开「选择元素」，在可展开的元素列表里点某一行；截图会同步高亮。
+   - 点截图以外的空白处取消选中。
+5. 确认「只点击你刚选中的这一个位置」或「还有 N 个相似的位置会被点到」以及识别方式，必要时展开「查看匹配条件」。
+6. 命名并保存，规则写入「本地规则」；如果本地规则当时是关闭的，会询问是否立即开启。
 
-  帮助你简化一些重复的流程, 如某些软件自动确认电脑登录
+## 声明
 
-- **跳过流程**
+- 本项目基于 GKD 二次开发，遵循上游的 [GPL-3.0-only](LICENSE) 许可证，上游版权归 [gkd-kit](https://github.com/gkd-kit/gkd) 所有。
+- 本项目为个人开发版本，禁止用于商业或非法用途；使用前请遵守上游项目的许可证与使用条款。
+- 应用 ID 为 `app.cyanskip.android`（开发版 `app.cyanskip.android.debug`），可与上游 GKD 共存，两者不要同时开启自动点击。
+- 快照包含界面文字与截图，默认只保存在本机；分享前请自行检查内容。
 
-  某些软件可能在启动时存在一些烦人的流程, 这个软件可以帮助你点击跳过这个流程
+## 功能范围
 
-## 免责声明
+- 首页：服务状态、功能开关、规则概览、添加规则与开启服务的三步引导。
+- 规则：本地规则的编辑与文件导入、订阅链接添加与更新、按应用/全局规则启停、执行记录。
+- 快照：悬浮按钮抓取、列表、预览、导出（下载/相册）、删除，以及**从快照生成规则**。
+- 设置：无障碍与悬浮窗权限、通知、后台隐藏、点击提示、快照选项、主题和备份恢复。
 
-**本项目遵循 [GPL-3.0-only](/LICENSE) 开源，项目仅供学习交流，禁止用于商业或非法用途**
+已移除上游功能：GitHub 上传与 Cookie、自更新、Google Play 渠道、高级设置与旧日志页面、特权与 Shizuku 接入、音量键与系统截屏触发抓取、快照自动保存至下载、项目内 HTTP 服务端（仅桌面开发宿主保留调试接口）。
 
-## 安装
+## 构建
 
-<a href="https://gkd.li/guide/"><img src="https://e.gkd.li/f23b704d-d781-494b-9719-393f95683b89" alt="Download from GKD.LI" width="32%" /></a><a href="https://play.google.com/store/apps/details?id=li.songe.gkd"><img src="https://e.gkd.li/f63fabeb-0342-4961-a46d-cac61b0f8856" alt="Download from Google Play" width="32%" /></a><a href="https://github.com/gkd-kit/gkd/releases"><img src="https://e.gkd.li/c1ef2bb9-7472-46d5-9806-81b4c37e5b4d" alt="Download from GitHub releases" width="32%" /></a>
+沿用上游 Gradle 工程，需要 JDK 21 与 Android SDK 37：
 
-如遇问题请先查看 [疑难解答](https://gkd.li/guide/faq)
+```powershell
+# 开发宿主与共享测试
+./gradlew.bat :cyanskip-app:compileKotlinJvm :cyanskip-app:jvmTest
+# Android 安装包（debug / release）
+./gradlew.bat :cyanskip-android:assembleDebug
+./gradlew.bat :cyanskip-android:assembleRelease
+```
 
-## 截图
+APK 输出到 `cyanskip-android/build/outputs/apk/`；本地交付包放在 `.local/dist/`（只保留当前版本，重新构建前删掉旧包）。Release 未配置 `CYANSKIP_STORE_FILE` 等签名属性时回退使用调试签名。桌面开发宿主、HTTP 调试与验证方式见[开发宿主说明](cyanskip-app/README.md)。
 
-|                                                               |                                                               |                                                               |                                                               |
-| ------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
-| ![img](https://e.gkd.li/1e8934c1-2303-4182-9ef2-ad4c46882570) | ![img](https://e.gkd.li/01f230d7-9b89-4314-b573-38bd233d22f9) | ![img](https://e.gkd.li/dfa0a782-b21e-473a-96e4-eef27773b71b) | ![img](https://e.gkd.li/641decd1-2e60-4e95-b78c-df38d1d98a4d) |
-| ![img](https://e.gkd.li/b216b703-d3de-4798-81ba-29e0ae63264f) | ![img](https://e.gkd.li/76c25ac9-4189-47cd-b40b-b9e72c79b584) | ![img](https://e.gkd.li/7288502e-808b-4d9a-88b5-1085abaa0d46) | ![img](https://e.gkd.li/aa974940-7773-409a-ae84-3c02fee9c770) |
+## 文档
 
-## 订阅
-
-GKD **默认不提供规则**，需自行添加本地规则，或者通过订阅链接的方式获取远程规则
-
-也可通过 [subscription-template](https://github.com/gkd-kit/subscription-template) 快速构建自己的远程订阅
-
-第三方订阅列表可在 <https://github.com/topics/gkd-subscription> 查看
-
-要加入此列表, 需点击仓库主页右上角设置图标后在 Topics 中添加 `gkd-subscription`
-
-<details>
-<summary>示例图片 - 添加至 Topics (点击展开)</summary>
-
-![image](https://e.gkd.li/9e340459-254f-4ca0-8a44-cc823069e5a7)
-
-</details>
-
-## 选择器
-
-一个类似 CSS 选择器的选择器, 能联系节点上下文信息, 更容易也更精确找到目标节点
-
-<https://gkd.li/guide/selector>
-
-[@[vid=\"menu\"] < [vid=\"menu_container\"] - [vid=\"dot_text_layout\"] > [text^=\"广告\"]](https://i.gkd.li/i/14881985?gkd=QFt2aWQ9Im1lbnUiXSA8IFt2aWQ9Im1lbnVfY29udGFpbmVyIl0gLSBbdmlkPSJkb3RfdGV4dF9sYXlvdXQiXSA-IFt0ZXh0Xj0i5bm_5ZGKIl0)
-
-<details>
-<summary>示例图片 - 选择器路径视图 (点击展开)</summary>
-
-[![image](https://e.gkd.li/a2ae667b-b8c5-4556-a816-37743347b972)](https://i.gkd.li/i/14881985?gkd=QFt2aWQ9Im1lbnUiXSA8IFt2aWQ9Im1lbnVfY29udGFpbmVyIl0gLSBbdmlkPSJkb3RfdGV4dF9sYXlvdXQiXSA-IFt0ZXh0Xj0i5bm_5ZGKIl0)
-
-</details>
-
-## 开发
-
+- [青跳开发版说明](docs/lite.md)
 - [应用架构与依赖](docs/architecture.md)
-- [Desktop 启动与调试](gkd-app/README.md)
+- [桌面开发宿主](cyanskip-app/README.md)
 - [本地数据与产物](docs/local-development.md)
 - [开发约束](AGENTS.md)
-
-## 衍生
-
-开发过程中的衍生项目，它们正在被 gkd 使用，也许对你有帮助
-
-- [kotlin-json5](https://github.com/lisonge/kotlin-json5)
-- [kotlin-codeorigin](https://github.com/lisonge/kotlin-codeorigin)
-- [android-api-diff](https://github.com/android-cs/android-api-diff)
-- [remap](https://github.com/lisonge/remap)
-- [priv-kit](https://github.com/priv-kit/priv-kit)
-- [morph-compose](https://github.com/lisonge/morph-compose)
-- [compose-webview2](https://github.com/lisonge/compose-webview2)
-
-## 捐赠
-
-如果 GKD 对你有用, 可以通过以下链接支持该项目
-
-<https://github.com/lisonge/sponsor>
-
-或前往 [Google Play](https://play.google.com/store/apps/details?id=li.songe.gkd) 给个好评

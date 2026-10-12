@@ -1,0 +1,42 @@
+{
+  "name": "@cyanskip/selector",
+  "version": "0.6.0",
+  "description": "cyan-skip 选择器解析与匹配库（基于 @gkd-kit/selector 二次开发）",
+  "type": "module",
+  "main": "./dist/cyanskip-selector.mjs",
+  "types": "./dist/cyanskip-selector.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/cyanskip-selector.d.mts",
+      "import": "./dist/cyanskip-selector.mjs"
+    }
+  },
+  "files": [
+    "dist",
+    "src/commonMain",
+    "src/jsMain"
+  ],
+  "scripts": {
+    "build": "node ./scripts/build.ts",
+    "type-check": "tsc",
+    "test:kotlin": "node ./scripts/kotlin-test.ts",
+    "test:node": "node --test scripts/**/*.test.ts",
+    "test": "pnpm test:kotlin && pnpm build && pnpm type-check && pnpm test:node",
+    "prepack": "pnpm test"
+  },
+  "author": "lisonge",
+  "license": "GPL-3.0-only",
+  "engines": {
+    "node": ">=22"
+  },
+  "engineStrict": true,
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "onFail": "error"
+    }
+  },
+  "dependencies": {
+    "regex-wasm": "^0.1.1"
+  }
+}

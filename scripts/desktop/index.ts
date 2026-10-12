@@ -20,10 +20,10 @@ pnpm app:tools services [--port 17322]
 pnpm app:tools service-start|service-stop --service Activity [--port 17322]
 pnpm app:tools service-event --service Activity --event Connected --attempt 1 [--reason TEXT] [--port 17322]
 
-Service commands require an isolated Desktop (--test). Services: Status, Button, Activity, Event, Track, Screenshot, Http, Accessibility, Automation.
+Service commands require an isolated Desktop (--test). Services: Status, Button, Activity, Event, Track, Screenshot, Http, Accessibility.
 Events: Authorized, Cancelled, Connected, Failed. Use the attempt returned by services.
 
-Capture requires adb and a built gkdDebug APK. It restores automation settings in finally.
+Capture requires adb and a built debug APK. It restores automation settings in finally.
 If recovery fails, keep automation-recovery.json and restore its two fields before retrying.`);
   } else if (positionals.length !== 1) throw new Error('Expected one command');
   else if (command === 'capture-profile') {

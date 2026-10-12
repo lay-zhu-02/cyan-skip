@@ -13,12 +13,10 @@ ktor = "3.6.0"
 lifecycle = "2.11.0"
 nav3 = "1.2.0"
 paging = "3.5.1"
-priv-kit = "0.17.3"
 proguard = "7.10.0"
 remap = "0.1.6"
 room = "3.0.3"
 serialization = "1.11.0"
-shizuku = "13.1.5"
 sqlite = "2.7.1"
 telephoto = "0.19.0"
 
@@ -82,12 +80,9 @@ kmp-navigation3 = "org.jetbrains.androidx.navigation3:navigation3-ui:1.1.2"
 kmp-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 kmp-viewmodel-navigation3 = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }
 permissions = "com.github.getActivity:XXPermissions:28.3"
-priv-kit-ui = { module = "io.github.priv-kit:priv-ui", version.ref = "priv-kit" }
 remap-annotation = { module = "li.songe.remap:remap-annotation", version.ref = "remap" }
 remap-processor = { module = "li.songe.remap:remap-processor", version.ref = "remap" }
 reorderable = "sh.calvin.reorderable:reorderable:3.1.0"
-rikka-shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
-rikka-shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 robolectric = "org.robolectric:robolectric:4.17"
 telephoto-zoomable = { module = "me.saket.telephoto:zoomable", version.ref = "telephoto" }
 toaster = "com.github.getActivity:Toaster:15.0"

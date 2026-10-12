@@ -4,31 +4,31 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, access, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { extractProfile, publishProfile, withAutomationPaused } from '../commands/capture-profile.ts';
+import { extractProfile, publishProfile, withMatchingPaused } from '../commands/capture-profile.ts';
 import type { Adb } from '../commands/capture-profile.ts';
 
-test('capture restores only automation fields on failure, preserving intervening settings', async () => {
+test('capture restores only matching switch on failure, preserving intervening settings', async () => {
   await mkdir(desktopTests, { recursive: true });
-  const dir = await mkdtemp(join(desktopTests, 'gkd-capture-test-'));
-  let store: Record<string, unknown> = { enableAutomator: true, automatorMode: 2, theme: 'light' };
+  const dir = await mkdtemp(join(desktopTests, 'cyanskip-capture-test-'));
+  let store: Record<string, unknown> = { enableMatch: true, theme: 'light' };
   const adb: Adb = async (...args) => {
     if (args[0] === 'push') store = JSON.parse(await readFile(args[1]!, 'utf8'));
     return Buffer.from(args[1] === 'cat' ? JSON.stringify(store) : '');
   };
   try {
-    await assert.rejects(withAutomationPaused(adb, dir, async () => {
-      assert.equal(store.enableAutomator, false); assert.equal(store.automatorMode, 1);
+    await assert.rejects(withMatchingPaused(adb, dir, async () => {
+      assert.equal(store.enableMatch, false);
       store.theme = 'dark'; throw new Error('export failed');
     }), /export failed/);
-    assert.deepEqual(store, { enableAutomator: true, automatorMode: 2, theme: 'dark' });
-    await assert.rejects(access(join(dir, 'automation-recovery.json')));
+    assert.deepEqual(store, { enableMatch: true, theme: 'dark' });
+    await assert.rejects(access(join(dir, 'matching-recovery.json')));
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 test('capture retains recovery record when restoration fails and refuses another run', async () => {
   await mkdir(desktopTests, { recursive: true });
-  const dir = await mkdtemp(join(desktopTests, 'gkd-capture-test-'));
-  let store: Record<string, unknown> = { enableAutomator: true };
+  const dir = await mkdtemp(join(desktopTests, 'cyanskip-capture-test-'));
+  let store: Record<string, unknown> = { enableMatch: true };
   let failRestore = false;
   const adb: Adb = async (...args) => {
     if (args[0] === 'push') {
@@ -38,11 +38,11 @@ test('capture retains recovery record when restoration fails and refuses another
     return Buffer.from(args[1] === 'cat' ? JSON.stringify(store) : '');
   };
   try {
-    await assert.rejects(withAutomationPaused(adb, dir, async () => { failRestore = true; }), /recovery required/);
-    const record = await readFile(join(dir, 'automation-recovery.json'), 'utf8');
-    assert.deepEqual(JSON.parse(record), { enableAutomator: true });
-    await assert.rejects(withAutomationPaused(adb, dir, async () => assert.fail('Must not run')), /EEXIST/);
-    assert.equal(await readFile(join(dir, 'automation-recovery.json'), 'utf8'), record);
+    await assert.rejects(withMatchingPaused(adb, dir, async () => { failRestore = true; }), /recovery required/);
+    const record = await readFile(join(dir, 'matching-recovery.json'), 'utf8');
+    assert.deepEqual(JSON.parse(record), { enableMatch: true });
+    await assert.rejects(withMatchingPaused(adb, dir, async () => assert.fail('Must not run')), /EEXIST/);
+    assert.equal(await readFile(join(dir, 'matching-recovery.json'), 'utf8'), record);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

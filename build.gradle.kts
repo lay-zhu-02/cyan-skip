@@ -3,7 +3,7 @@ import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
 import com.android.build.api.dsl.LibraryExtension
 import com.android.build.gradle.AppPlugin
 import com.android.build.gradle.LibraryPlugin
-import li.gkd.gradle.gitInfo
+import app.cyanskip.gradle.gitInfo
 import org.jetbrains.kotlin.compose.compiler.gradle.ComposeCompilerGradlePluginExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
@@ -27,8 +27,8 @@ plugins {
     alias(libs.plugins.littlerobots.version)
 }
 
-extra["gkdVersionName"] = "1.12.1" + project.gitInfo.versionNameSuffix.orEmpty()
-extra["gkdVersionCode"] = 92
+extra["cyanskipVersionName"] = "1.12.1" + project.gitInfo.versionNameSuffix.orEmpty()
+extra["cyanskipVersionCode"] = 92
 
 object Cfg {
     val compileSdk get() = 37

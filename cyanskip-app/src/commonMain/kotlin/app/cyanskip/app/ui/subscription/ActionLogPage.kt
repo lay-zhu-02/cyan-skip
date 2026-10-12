@@ -1,0 +1,453 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.compose.collectAsLazyPagingItems
+import app.cyanskip.app.model.showActivityId
+import app.cyanskip.app.resources.Res
+import app.cyanskip.app.resources.action_log_activity_unknown
+import app.cyanskip.app.resources.action_log_open_app
+import app.cyanskip.app.resources.action_log_title
+import app.cyanskip.app.resources.data_load_failed
+import app.cyanskip.app.resources.loading_progress
+import app.cyanskip.app.resources.page_exclusion_add_current
+import app.cyanskip.app.resources.page_exclusion_remove
+import app.cyanskip.app.resources.rule_actions
+import app.cyanskip.app.resources.rule_enable
+import app.cyanskip.app.resources.rule_enable_in_app
+import app.cyanskip.app.resources.rule_group_key_description
+import app.cyanskip.app.resources.rule_index_description
+import app.cyanskip.app.resources.rule_key_prefix
+import app.cyanskip.app.resources.rule_missing
+import app.cyanskip.app.resources.rule_view
+import app.cyanskip.app.resources.subscription_id_description
+import app.cyanskip.app.resources.update_success
+import app.cyanskip.app.resources.version_prefixed
+import app.cyanskip.app.rule.RuleSetting
+import app.cyanskip.app.state.Loadable
+import app.cyanskip.app.subscription.RawSubscription
+import app.cyanskip.app.subscription.SubscriptionRepository
+import app.cyanskip.app.ui.MainViewModel
+import app.cyanskip.app.ui.component.CsAppNameText
+import app.cyanskip.app.ui.component.CsGroupNameText
+import app.cyanskip.app.ui.component.CsIcon
+import app.cyanskip.app.ui.component.CsIconButton
+import app.cyanskip.app.ui.component.CsIcons
+import app.cyanskip.app.ui.component.CsLogTimeText
+import app.cyanskip.app.ui.component.CsLogTimeline
+import app.cyanskip.app.ui.component.CsRuleSettingsContent
+import app.cyanskip.app.ui.component.CsRuleSettingsSheet
+import app.cyanskip.app.ui.component.CsScaffold
+import app.cyanskip.app.ui.component.CsTopAppBar
+import app.cyanskip.app.ui.component.CsTwoLineText
+import app.cyanskip.app.ui.component.animateListItem
+import app.cyanskip.app.ui.component.csLogTimelineRail
+import app.cyanskip.app.ui.component.rememberListScrollState
+import app.cyanskip.app.ui.component.rememberRuleControlEnvironment
+import app.cyanskip.app.ui.image.CsAppIcon
+import app.cyanskip.app.ui.navigation.ActionLogRoute
+import app.cyanskip.app.ui.navigation.AppConfigRoute
+import app.cyanskip.app.ui.navigation.SubsAppGroupListRoute
+import app.cyanskip.app.ui.navigation.SubsGlobalGroupListRoute
+import app.cyanskip.app.ui.share.launchUi
+import app.cyanskip.app.ui.share.noRippleClickable
+import app.cyanskip.app.ui.style.itemHorizontalPadding
+import app.cyanskip.app.ui.style.scaffoldPadding
+import app.cyanskip.app.ui.text.getSync
+import app.cyanskip.app.util.ToastUtils
+import app.cyanskip.db.ActionLog
+import app.cyanskip.db.RuleGroupType
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun ActionLogPage(
+    route: ActionLogRoute,
+) {
+    val mainVm = MainViewModel.requireCurrent()
+    val subscriptions by SubscriptionRepository.snapshotFlow.collectAsStateWithLifecycle()
+    val subsId = route.subsId
+    val appId = route.appId
+    val appScoped = subsId == null && appId != null
+    val vm = viewModel { ActionLogViewModel(route) }
+    val dialogState by vm.dialogStateFlow.collectAsStateWithLifecycle()
+    val scope = vm.scope
+    val list = vm.pagingDataFlow.collectAsLazyPagingItems()
+    val pageScrollState = rememberListScrollState()
+    val scrollBehavior = pageScrollState.scrollBehavior
+    val listState = pageScrollState.listState
+    pageScrollState.ResetOnChange(list.itemCount > 0)
+    CsScaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            CsTopAppBar(
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    CsIconButton(
+                        imageVector = CsIcons.ArrowBack,
+                        onClick = {
+                            mainVm.navigator.pop()
+                        },
+                    )
+                },
+                title = {
+                    val title = stringResource(Res.string.action_log_title)
+                    val titleModifier = Modifier.noRippleClickable {
+                        pageScrollState.resetScroll()
+                    }
+                    if (subsId != null) {
+                        CsTwoLineText(
+                            title = subscriptions.value?.subscriptions?.get(subsId)?.name
+                                ?: subsId.toString(),
+                            subtitle = title,
+                            modifier = titleModifier,
+                        )
+                    } else if (appId != null) {
+                        CsTwoLineText(
+                            title = title,
+                            subtitle = appId,
+                            showApp = true,
+                            appContent = { id, fallback -> CsAppNameText(id, fallback) },
+                            modifier = titleModifier,
+                        )
+                    } else {
+                        Text(
+                            text = title,
+                            modifier = titleModifier,
+                        )
+                    }
+                })
+        },
+        content = { contentPadding ->
+            CsLogTimeline(
+                appLabel = { rememberRuleControlEnvironment().apps[it]?.name ?: it },
+                appIcon = { CsAppIcon(it, 24.dp) },
+                appName = { id, modifier ->
+                    CsAppNameText(
+                        id,
+                        modifier = modifier,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                },
+                onOpenApp = { mainVm.navigator.navigate(AppConfigRoute(it)) },
+                items = list,
+                listState = listState,
+                key = { it.actionLog.id },
+                appId = { it.actionLog.appId },
+                time = { it.actionLog.ctime },
+                modifier = Modifier.scaffoldPadding(contentPadding),
+                showAppHeaders = !appScoped,
+                contextChanged = { previous, current ->
+                    !sameActionLogContext(previous.actionLog, current.actionLog)
+                },
+                contextHeader = { item, previous ->
+                    ActionLogContextHeader(
+                        item = item,
+                        previousLog = previous?.actionLog,
+                        includeSubscriptionName = subsId == null,
+                    )
+                },
+            ) { entry ->
+                ActionLogEntry(
+                    modifier = Modifier.animateListItem(),
+                    item = entry,
+                    onClick = { vm.showActionLog(entry.actionLog) },
+                )
+            }
+        })
+
+    dialogState?.let { state ->
+        ActionLogDialog(
+            state = state,
+            onDismissRequest = vm::dismissActionLog,
+            showAppContext = appId == null,
+            onOpenApp = {
+                vm.dismissActionLog()
+                mainVm.navigator.navigate(AppConfigRoute(state.actionLog.appId))
+            },
+            onOpenRule = {
+                vm.dismissActionLog()
+                val actionLog = state.actionLog
+                if (actionLog.groupType == RuleGroupType.App) {
+                    mainVm.navigator.navigate(
+                        SubsAppGroupListRoute(
+                            actionLog.subsId, actionLog.appId, actionLog.groupKey
+                        )
+                    )
+                } else if (actionLog.groupType == RuleGroupType.Global) {
+                    mainVm.navigator.navigate(
+                        SubsGlobalGroupListRoute(
+                            actionLog.subsId, actionLog.groupKey
+                        )
+                    )
+                }
+            },
+            onSettingChange = { setting ->
+                val request = vm.prepareSwitch(state)
+                scope.launchUi {
+                    vm.applySwitch(request, setting)?.failureMessage()
+                        ?.let { ToastUtils.show(it) }
+                }
+            },
+            onToggleActivityExclusion = {
+                scope.launchUi {
+                    vm.updateActivityExclusion(state)
+                    ToastUtils.show(Res.string.update_success.getSync())
+                }
+            },
+        )
+    }
+}
+
+private fun sameActionLogContext(first: ActionLog, second: ActionLog): Boolean =
+    first.activityId == second.activityId &&
+            first.subsId == second.subsId &&
+            first.subsVersion == second.subsVersion
+
+@Composable
+private fun ActionLogContextHeader(
+    item: ActionLogListItem,
+    previousLog: ActionLog?,
+    includeSubscriptionName: Boolean,
+) {
+    val activityChanged = previousLog == null || previousLog.activityId != item.actionLog.activityId
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .csLogTimelineRail(MaterialTheme.colorScheme.outlineVariant)
+            .padding(
+                start = 20.dp, end = itemHorizontalPadding,
+                top = if (previousLog == null) 4.dp else 8.dp, bottom = 4.dp
+            ),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (activityChanged) {
+                CsIcon(
+                    imageVector = CsIcons.Layers,
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary,
+                    contentDescription = null,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primary),
+                )
+            }
+        }
+        ActionLogContextText(
+            item = item,
+            showActivity = activityChanged,
+            showSubscriptionLine = previousLog == null ||
+                    previousLog.subsId != item.actionLog.subsId ||
+                    previousLog.subsVersion != item.actionLog.subsVersion,
+            includeSubscriptionName = includeSubscriptionName,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun ActionLogContextText(
+    item: ActionLogListItem,
+    showActivity: Boolean,
+    showSubscriptionLine: Boolean,
+    includeSubscriptionName: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val actionLog = item.actionLog
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        if (showActivity) {
+            Text(
+                text = actionLog.showActivityId
+                    ?: stringResource(Res.string.action_log_activity_unknown),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.MiddleEllipsis,
+            )
+        }
+        if (showSubscriptionLine) {
+            Text(
+                text = if (includeSubscriptionName) {
+                    listOf(
+                        item.subscription?.name ?: stringResource(
+                            Res.string.subscription_id_description,
+                            actionLog.subsId
+                        ),
+                        stringResource(Res.string.version_prefixed, actionLog.subsVersion),
+                    ).joinToString(" · ")
+                } else {
+                    stringResource(Res.string.version_prefixed, actionLog.subsVersion)
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionLogEntry(
+    modifier: Modifier = Modifier,
+    item: ActionLogListItem,
+    onClick: () -> Unit,
+) {
+    val (actionLog, group, rule) = item
+    val ruleName = rule?.name?.takeIf { it.isNotBlank() } ?: if ((group?.rules?.size ?: 0) > 1) {
+        val key = actionLog.ruleKey?.let { stringResource(Res.string.rule_key_prefix, it) } ?: ""
+        stringResource(Res.string.rule_index_description, key, actionLog.ruleIndex)
+    } else {
+        null
+    }
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .csLogTimelineRail(MaterialTheme.colorScheme.outlineVariant)
+            .clickable(onClick = onClick)
+            .padding(start = 56.dp, end = itemHorizontalPadding, top = 6.dp, bottom = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            CsGroupNameText(
+                isGlobal = actionLog.groupType == RuleGroupType.Global,
+                text = group?.name
+                    ?: if (item.subscriptionResolved) stringResource(Res.string.rule_missing)
+                    else stringResource(
+                        Res.string.rule_group_key_description,
+                        actionLog.groupKey.toString()
+                    ),
+                color = if (group == null) MaterialTheme.colorScheme.onSurfaceVariant else Color.Unspecified,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (ruleName != null) {
+                Text(
+                    text = ruleName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        CsLogTimeText(actionLog.ctime)
+    }
+}
+
+@Composable
+private fun ActionLogDialog(
+    state: ActionLogDialogState,
+    onDismissRequest: () -> Unit,
+    showAppContext: Boolean,
+    onOpenApp: () -> Unit,
+    onOpenRule: () -> Unit,
+    onSettingChange: (RuleSetting) -> Unit,
+    onToggleActivityExclusion: () -> Unit,
+) {
+    val actionLog = state.actionLog
+
+    val environment = rememberRuleControlEnvironment()
+    CsRuleSettingsSheet(
+        title = state.group?.name ?: stringResource(Res.string.rule_actions),
+        subtitle = if (showAppContext) environment.apps[actionLog.appId]?.name
+            ?: actionLog.appId else null,
+        onDismissRequest = onDismissRequest,
+    ) {
+        val configs = state.configs
+        if (state.loadState is Loadable.Failure) {
+            Text(stringResource(Res.string.data_load_failed), Modifier.padding(16.dp))
+        } else if (state.loadState is Loadable.Loading) {
+            Text(stringResource(Res.string.loading_progress), Modifier.padding(16.dp))
+        }
+        if (state.subscription != null && state.group != null && configs != null) {
+            val control =
+                environment.resolve(state.subscription, state.group, actionLog.appId, configs)
+            CsRuleSettingsContent(
+                control, onSettingChange,
+                title = if (state.group is RawSubscription.RawGlobalGroup) stringResource(Res.string.rule_enable_in_app) else stringResource(
+                    Res.string.rule_enable
+                )
+            )
+        }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.large,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            if (showAppContext) {
+                ItemText(text = stringResource(Res.string.action_log_open_app), onClick = onOpenApp)
+            }
+            if (state.subscription != null && state.group != null) {
+                ItemText(text = stringResource(Res.string.rule_view), onClick = onOpenRule)
+            }
+            if (actionLog.activityId != null && state.subscription != null && state.group != null && configs != null) {
+                ItemText(
+                    text = if (state.activityDisabled) stringResource(Res.string.page_exclusion_remove) else stringResource(
+                        Res.string.page_exclusion_add_current
+                    ),
+                    onClick = onToggleActivityExclusion,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ItemText(
+    text: String,
+    color: Color = Color.Unspecified,
+    onClick: () -> Unit
+) {
+    val modifier = Modifier
+        .clickable(onClick = onClick)
+        .fillMaxWidth()
+        .padding(16.dp)
+    Text(
+        modifier = modifier,
+        text = text,
+        color = color,
+    )
+}

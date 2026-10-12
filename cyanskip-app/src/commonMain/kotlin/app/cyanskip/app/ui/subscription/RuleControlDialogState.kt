@@ -1,0 +1,81 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.MutableStateFlow
+import app.cyanskip.app.rule.RuleGroupConfigService
+import app.cyanskip.app.rule.explainControl
+import app.cyanskip.app.rule.RuleGroupTarget
+import app.cyanskip.app.state.Loadable
+import app.cyanskip.app.subscription.SubscriptionRepository
+import app.cyanskip.app.ui.component.rememberRuleControlEnvironment
+import app.cyanskip.app.ui.share.DeletionTarget
+
+private class RuleControlRequest(val target: RuleGroupTarget)
+
+class RuleControlDialogState {
+    private val requestFlow = MutableStateFlow<RuleControlRequest?>(null)
+
+    fun show(target: RuleGroupTarget) {
+        requestFlow.value = RuleControlRequest(target)
+    }
+
+    private fun dismiss(request: RuleControlRequest) {
+        if (requestFlow.value === request) requestFlow.value = null
+    }
+
+    fun dismissForDeletion(targets: Set<DeletionTarget>) {
+        val request = requestFlow.value ?: return
+        val target = request.target
+        if (DeletionTarget.Subscription(target.subsId) in targets ||
+            (target is RuleGroupTarget.App && DeletionTarget.App(target.subsId, target.appId) in targets) ||
+            DeletionTarget.Group(target.subsId, target.appId, target.groupKey) in targets
+        ) {
+            dismiss(request)
+        }
+    }
+
+    @Composable
+    fun Render() {
+        val request by requestFlow.collectAsStateWithLifecycle()
+        request?.let { current ->
+            key(current) {
+                val target = current.target
+                val environment = rememberRuleControlEnvironment()
+                val subscriptions by SubscriptionRepository.snapshotFlow.collectAsStateWithLifecycle()
+                val subscription = subscriptions.value?.subscriptions?.get(target.subsId)
+                val group = when (target) {
+                    is RuleGroupTarget.App -> subscription?.apps?.find { it.id == target.appId }
+                        ?.groups?.find { it.key == target.groupKey }
+                    is RuleGroupTarget.Global -> subscription?.globalGroups?.find { it.key == target.groupKey }
+                }
+                val configurationFlow =
+                    remember(target) { RuleGroupConfigService.groupConfiguration(target) }
+                val configuration by configurationFlow.collectAsStateWithLifecycle(null)
+                val missing =
+                    subscriptions is Loadable.Ready && (subscription == null || group == null)
+                LaunchedEffect(missing) {
+                    if (missing) dismiss(current)
+                }
+                val snapshot = configuration?.snapshot
+                if (!missing && subscription != null && group != null && snapshot != null) {
+                    val control = environment.resolve(subscription, group, target.pageAppId, snapshot)
+                    CsRuleControlDialog(
+                        subscription = subscription,
+                        group = group,
+                        appId = target.pageAppId,
+                        control = control,
+                        explanation = RuleGroupConfigService.policy.explainControl(
+                            subscription, group, target.pageAppId, snapshot, control,
+                        ),
+                        onDismissRequest = { dismiss(current) },
+                    )
+                }
+            }
+        }
+    }
+}

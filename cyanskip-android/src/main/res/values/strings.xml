@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">青跳</string>
+    <string name="a11y_desc">青跳根据你启用的规则读取界面节点，点击匹配的跳过或关闭按钮。\n\n你也可以主动抓取页面快照，用于分析和编写规则。可以随时在应用内暂停规则，或在系统设置中关闭此服务。</string>
+    <string name="import_backup">导入备份</string>
+    <string name="http_server">HTTP服务</string>
+    <string name="snapshot_button">快照按钮</string>
+    <string name="rule_match">规则匹配</string>
+    <string name="record_activity">界面服务</string>
+    <string name="record_a11y_event">事件服务</string>
+</resources>

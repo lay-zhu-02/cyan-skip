@@ -1,0 +1,81 @@
+package app.cyanskip.app.ui.subscription
+
+import androidx.compose.runtime.Composable
+import app.cyanskip.app.resources.Res
+import app.cyanskip.app.resources.category_disabled
+import app.cyanskip.app.resources.category_disabled_description
+import app.cyanskip.app.resources.category_enabled
+import app.cyanskip.app.resources.category_enabled_description
+import app.cyanskip.app.resources.category_follow_subscription
+import app.cyanskip.app.resources.category_follow_subscription_description
+import app.cyanskip.app.resources.category_use_group_default
+import app.cyanskip.app.resources.category_use_group_default_description
+import app.cyanskip.app.resources.rule_current_app_scope
+import app.cyanskip.app.resources.rule_group_scope
+import app.cyanskip.app.resources.rule_switch_changed_counts
+import app.cyanskip.app.resources.rule_switch_restricted_count_suffix
+import app.cyanskip.app.resources.rule_switch_skipped_count
+import app.cyanskip.app.resources.setting_follow_default
+import app.cyanskip.app.resources.setting_manual_disabled
+import app.cyanskip.app.resources.setting_manual_enabled
+import app.cyanskip.app.resources.subscription_app_switch_scope
+import app.cyanskip.app.rule.CategorySetting
+import app.cyanskip.app.rule.RuleControlScope
+import app.cyanskip.app.rule.RuleSetting
+import app.cyanskip.app.rule.RuleSwitchResult
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.getString
+import org.jetbrains.compose.resources.stringResource
+
+private val CategorySetting.labelResource: StringResource
+    get() = when (this) {
+        CategorySetting.FollowSubscription -> Res.string.category_follow_subscription
+        CategorySetting.Enabled -> Res.string.category_enabled
+        CategorySetting.Disabled -> Res.string.category_disabled
+        CategorySetting.GroupDefault -> Res.string.category_use_group_default
+    }
+
+val CategorySetting.label: String
+    @Composable get() = stringResource(labelResource)
+
+suspend fun CategorySetting.labelText(): String = getString(labelResource)
+
+private val RuleSetting.labelResource: StringResource
+    get() = when (this) {
+        RuleSetting.FollowDefault -> Res.string.setting_follow_default
+        RuleSetting.Enabled -> Res.string.setting_manual_enabled
+        RuleSetting.Disabled -> Res.string.setting_manual_disabled
+    }
+
+val RuleSetting.label: String
+    @Composable get() = stringResource(labelResource)
+
+suspend fun RuleSetting.labelText(): String = getString(labelResource)
+
+private val RuleControlScope.labelResource: StringResource
+    get() = when (this) {
+        RuleControlScope.Group -> Res.string.rule_group_scope
+        RuleControlScope.CurrentApp -> Res.string.rule_current_app_scope
+        RuleControlScope.SubscriptionApp -> Res.string.subscription_app_switch_scope
+    }
+
+val RuleControlScope.label: String
+    @Composable get() = stringResource(labelResource)
+
+suspend fun RuleControlScope.labelText(): String = getString(labelResource)
+
+val CategorySetting.description: String
+    @Composable get() = stringResource(when (this) {
+        CategorySetting.FollowSubscription -> Res.string.category_follow_subscription_description
+        CategorySetting.Enabled -> Res.string.category_enabled_description
+        CategorySetting.Disabled -> Res.string.category_disabled_description
+        CategorySetting.GroupDefault -> Res.string.category_use_group_default_description
+    })
+
+suspend fun RuleSwitchResult.failureMessage(): String? = if (invalid > 0)
+    getString(Res.string.rule_switch_skipped_count, invalid.toString()) else null
+
+suspend fun RuleSwitchResult.description(): String =
+    getString(Res.string.rule_switch_changed_counts, changed.toString(), unchanged.toString()) +
+        (failureMessage()?.let { "，$it" } ?: "") +
+        (if (restricted > 0) getString(Res.string.rule_switch_restricted_count_suffix, restricted.toString()) else "")

@@ -1,14 +1,25 @@
 # Repository Instructions
 
-设计与依赖见 [应用架构](docs/architecture.md)，启动和 HTTP 调试见 [Desktop 开发](gkd-app/README.md)，固定目录见 [本地产物](docs/local-development.md)。本文件只维护开发约束。
+项目英文名 cyan-skip，中文名青跳。青跳是基于上游 [GKD](https://github.com/gkd-kit/gkd) 二次开发的独立精简版，仅保留规则点击与页面快照等基础功能，不做商用。
+
+命名：面向用户的各类字符串（文档、界面文案、日志与工具输出、窗口标题、产物名）都用 `cyan-skip`；代码及其标识都用无连字符的 `cyanskip`（包名、`applicationId`、Gradle 工程与模块名、npm 包名、属性键与环境变量、URI scheme、数据文件名与字段、JS 桥接名）。两者不混用。
+
+## 不兼容旧版本（硬性约定）
+
+- 本项目不兼容任何旧版本，也不为此保留代码或逻辑：旧应用数据、旧数据库结构与迁移、旧备份、旧设置文件名与字段、旧目录与文件布局、旧包名与应用 ID、旧 URI scheme 与深链路、旧路由页面、旧协议字段、旧产物命名，一律不读取、不迁移、不转换、不回退、不双写。
+- 禁止留尾巴：迁移器、转换器、typealias/别名壳、为旧值保留的 `@Deprecated`、条件兼容分支、"以后再删"的注释与常量、只验证旧格式的测试，全部删除。破坏性变更直接改：字段该删就删，文件该改名就改名，改完在提交说明与文档里写明需要全新数据环境；程序不自动迁移，也不自动清空手机或日常开发数据。
+- 不属于本条范围：Android 系统版本适配（不同 API 级的行为差异）、外部规则与订阅格式的兼容解析、第三方库对自身旧版本的兼容；当前版本内部的标识一致性也不属于"兼容旧版本"，路由序列化名称、组件类名、AIDL、数据文件名与字段必须与全部消费者同步修改。
+- 例外的唯一来源是用户明确要求，并须同时在代码注释和本文件里说明原因。
+
+设计与依赖见 [应用架构](docs/architecture.md)，启动和 HTTP 调试见 [Desktop 开发](cyanskip-app/README.md)，固定目录见 [本地产物](docs/local-development.md)。本文件只维护开发约束。
 
 ## 模块与平台
 
-- 模块统一使用 `gkd-` 前缀，依赖方向为 `gkd-android` → `gkd-app` → `gkd-db` / `gkd-selector`，禁止反向依赖。gkd-app 承载完整应用：commonMain 放业务、UI、ViewModel、导航；androidMain/jvmMain 放平台实现。gkd-android 仅负责 Manifest、原生 res、渠道、签名、打包和设备测试；JVM 启动/打包位于 gkd-app，TypeScript 工具位于根 `scripts/desktop`。
-- Desktop 仅为开发宿主，不另建产品后端、复制页面或仅为它拆共享模块/空壳 Repository；数据库职责留在 gkd-db。领域逻辑不得依赖 Compose、Android Context 或宿主。Android/JVM 共用实现可直接在 commonMain 使用两端支持的 Java API，出现实际差异或非 JVM 目标时再隔离，不增中间源码集。
-- 公共根包及 gkd-app Android namespace 为 `li.gkd.app`，UI/导航/ViewModel 位于 `li.gkd.app.ui.*`；Desktop 同样使用该包层级，以 jvmMain 和职责文件名区分，不设 desktop 包。源码目录与包名一致。gkd-android namespace 为 `li.gkd.android`，Manifest 使用完整组件名。
-- androidMain 普通工具、适配、UI 接入及基类按职责归入 `li.gkd.app.*`；已注册 Application、Activity、Service、磁贴、特权入口及紧密关联实现保留原身份。`com.google.android.accessibility.selecttospeak.SelectToSpeakService` 的包名、路径和注册不变。包名整理不得改变组件、路由序列化名称/参数、AIDL 或持久化兼容标识。
-- Android 权限、Activity Result、通知、悬浮窗、Service 和特权进程位于 gkd-app/src/androidMain，由真实组件管理生命周期。gkd-aidl 只编译 Binder 协议；gkd-hidden-api 只提供 stub。引用 stub 的模块必须独立完成对应字节码的 remap。
+- 模块统一使用 `cyanskip-` 前缀，依赖方向为 `cyanskip-android` → `cyanskip-app` → `cyanskip-db` / `cyanskip-selector`，禁止反向依赖。cyanskip-app 承载完整应用：commonMain 放业务、UI、ViewModel、导航；androidMain/jvmMain 放平台实现。cyanskip-android 仅负责 Manifest、原生 res、签名、打包和设备测试；JVM 启动/打包位于 cyanskip-app，TypeScript 工具位于根 `scripts/desktop`。
+- Desktop 仅为开发宿主，不另建产品后端、复制页面或仅为它拆共享模块/空壳 Repository；数据库职责留在 cyanskip-db。领域逻辑不得依赖 Compose、Android Context 或宿主。Android/JVM 共用实现可直接在 commonMain 使用两端支持的 Java API，出现实际差异或非 JVM 目标时再隔离，不增中间源码集。
+- 公共根包及 cyanskip-app Android namespace 为 `app.cyanskip.app`，UI/导航/ViewModel 位于 `app.cyanskip.app.ui.*`；Desktop 同样使用该包层级，以 jvmMain 和职责文件名区分，不设 desktop 包。源码目录与包名一致。cyanskip-android namespace 为 `app.cyanskip.android`，Manifest 使用完整组件名。
+- androidMain 普通工具、适配、UI 接入及基类按职责归入 `app.cyanskip.app.*`；已注册 Application、Activity、Service、磁贴、特权入口及紧密关联实现保留原身份。`com.google.android.accessibility.selecttospeak.SelectToSpeakService` 的包名、路径和注册不变。包名整理不得改变组件、路由序列化名称/参数、AIDL 或持久化兼容标识。
+- Android 权限、Activity Result、通知、悬浮窗、Service位于 cyanskip-app/src/androidMain，由真实组件管理生命周期。cyanskip-hidden-api 仅保留无障碍读取所需的 stub。引用 stub 的模块必须独立完成对应字节码的 remap。
 - ViewModel、Repository、业务状态和流程在 commonMain 保持唯一实现，ViewModel 使用 `XxxViewModel` 命名。禁止同名宿主子类、空壳继承、旧路径 typealias 或纯转发包装；共享类默认不可继承，宿主在原 ViewModelStoreOwner 直接创建，复杂/复用构造可用明确工厂。
 - 平台差异优先使用对应功能包的函数级 `expect/actual`，实现文件为 `.android.kt` / `.jvm.kt`；禁止整份 ViewModel、Repository 或业务流程 actual 化。能力签名只用公共类型，不导航、弹 Toast 或读取 UI ViewModel；仅 UI 组装可用 Composable expect/actual，需平台 UI 能力时显式接收所属 UiHost。无生命周期工具只持有 Application Context，Activity/窗口引用限于生命周期绑定的 UI 会话。
 - 不支持的平台动作统一返回 `PlatformResult<T>`，无数据成功为 `Unit`；不得另造 Unsupported 类型或用 Boolean/null 暗示不支持。契约明确成功含义，保留异常/取消传播，不替代业务结果、用户取消或权限状态。
@@ -17,7 +28,7 @@
 ## UI 与生命周期
 
 - 两端共用 commonMain 的生产页面、组件、业务和事件链，模拟输入也经过生产 Repository/ViewModel；共享代码不得直接依赖 Android Application、平台专属 Store/Service 或伪造全局实例；共享 MainViewModel 的访问遵循下述单主界面规则。Desktop 默认四标签，组件目录仅显式诊断。新增入口同时覆盖双端及下游弹窗、面板、返回路径，不用整页 Toast/占位掩盖缺失；交付需业务、读写、生命周期和验证证据。
-- 两端共用 `GkAppNavigation` 注册及 `GkNavigation` 保存状态/条目生命周期；禁止 Desktop 字符串分支注册生产路由、复制平台路由或另写保存/导航规则。普通/编辑页面过渡统一声明，公共页面只注册一次；HTTP 标签等状态读取生产来源。
+- 两端共用 `CsAppNavigation` 注册及 `CsNavigation` 保存状态/条目生命周期；禁止 Desktop 字符串分支注册生产路由、复制平台路由或另写保存/导航规则。普通/编辑页面过渡统一声明，公共页面只注册一次；HTTP 标签等状态读取生产来源。
 - MainViewModel 属于主界面的 ViewModelStore，页面 ViewModel 属于具体导航条目；有需要保留的页面状态或事件流程时按需创建，不为纯展示或组件瞬时状态创建。根不持有其他 ViewModel 或子 ViewModelStore；子路由用条目标准 API 获取，多次入栈实例独立、出栈清理，不预建、缓存或跨路由借用。导航不重建仓库，宿主退出清理 ViewModel/协程；Desktop 场景重载只重置页面/草稿，不清空数据或模拟配置。
 - 路由及私有 Composable 可获取页面 ViewModel、处理平台 UI；主题、通用布局、可复用组件和工具仅接收状态/事件，不通过默认参数、工厂、CompositionLocal 或全局入口隐藏获取。Service、悬浮窗、后台任务使用自身作用域和应用仓库，不借用或补建页面 ViewModel。
 - Android/Desktop 均采用单主界面设计，同一应用运行实例只存在一个根 MainViewModel，其生命周期覆盖所有子页面 ViewModel。生产页面、其私有 Composable 及所属子页面 ViewModel（含 commonMain）可通过 `MainViewModel.requireCurrent()` 获取已注册的根实例，无需逐层传递。宿主完成初始化和必要绑定后注册，根实例清理时注销；静态入口只提供访问，不创建实例或延长其生命周期。主题、通用布局、可复用组件、工具、Repository、Service、悬浮窗和后台任务不得通过该入口获取，也不引入 LocalMainViewModel。
@@ -27,7 +38,7 @@
 - `XxxUiState/Actions` 仅用于确有需要的复用、预览或复杂契约；UiState 是不可变快照，不含 Flow、Paging 或高频状态；多个构造路径重复映射时才提取私有构建函数。业务状态不通过 CompositionLocal 传递。
 - 应用/仓库只读 Flow 在实际消费处用 `collectAsStateWithLifecycle` 收集，Paging 用专用 API，高频状态放最小子树；不为转发而复制进 UiState/ViewModel；生产路由页面可获取所属 ViewModel，可复用组件接收不可变值和明确事件。ViewModel 可管理业务查询聚合、Paging 缓存、加载/失败和保存冲突基准，不因 map/combine 一律迁出。
 - ViewModel 状态仅在所属 VM 内修改，对外只暴露只读状态及明确事件方法；可变字段保持私有，只读 StateFlow 使用 Explicit Backing Fields 持有 MutableStateFlow，禁止 `_xxxFlow` 双属性及 `.asStateFlow()`。Composable 条件输出可用条件区块或清晰的提前返回，优先沿用邻近风格，不为形式增加嵌套或无关重构。
-- 共享页面用 `GkScaffold` 接收宿主 Insets（Android 原生，Desktop 模拟），不重复加系统留白。滚动内容末尾用 `GkPageBottomSpace()` / LazyColumn 的 `gkPageBottomSpace()`，高度由 GkPageBottomSpaceDefaults 统一；已有末尾 item 可内嵌但不重复添加，不替代系统栏或 IME Insets。
+- 共享页面用 `CsScaffold` 接收宿主 Insets（Android 原生，Desktop 模拟），不重复加系统留白。滚动内容末尾用 `CsPageBottomSpace()` / LazyColumn 的 `csPageBottomSpace()`，高度由 CsPageBottomSpaceDefaults 统一；已有末尾 item 可内嵌但不重复添加，不替代系统栏或 IME Insets。
 - 动画不阻塞交互：禁止因过渡、图标变形、普通开关短暂保存或假设快速点击而禁用、节流、延时解锁或吞点击。禁用仅对应数据、输入、权限等业务前提，写入一致性交业务层处理。退场重复内容可隐藏于无障碍导航，但不改变颜色/增加等待；检查覆盖过渡中点击和切换。
 
 ## 最小实现与防御边界
@@ -52,12 +63,12 @@
 ## 资源与 Kotlin 规范
 
 - 禁止新增 XML，例外仅 Compose strings/plurals、Android 原生字符串及语言限定资源、app_icon/service 等平台配置。可用 Kotlin 表达的 UI/图标用 `.kt`；页面图标必须 ImageVector，drawable XML 仅限 Manifest 等平台配置及其依赖，即使同图标双用，页面仍用 ImageVector。不确定例外时先问用户。
-- 原生 res 归 gkd-android，gkd-app 不引用其 R；通知小图标通过 Application Manifest `notificationSmallIcon` 的 `android:resource` 注入，运行时校验非零，不持久化 ID。共享颜色用 Kotlin，Compose Resources 位于 gkd-app。
+- 原生 res 归 cyanskip-android，cyanskip-app 不引用其 R；通知小图标通过 Application Manifest `notificationSmallIcon` 的 `android:resource` 注入，运行时校验非零，不持久化 ID。共享颜色用 Kotlin，Compose Resources 位于 cyanskip-app。
 - 共享及普通 Android Kotlin 文案统一官方 Compose Resources（`Res.string/plurals`），不建自定义 UiString/Desktop 文案表或原生副本；只有 Manifest/平台配置/变体标签保留原生 ID，Kotlin 可按需读取平台标签。语义/参数与持久化数据分离，文案不在枚举、单例或静态初始化解析缓存，语言切换不改写用户模板。
 - 参数只用 `%1$s`、`%2$s` 等位置文本占位符；禁止数值/精度/补零格式指令，Kotlin 按明确 Locale/精度先格式化。Compose 用官方 Composable API，协程用 suspend getString/getPluralString；getSync 仅限低频同步边界，不用于静态初始化、高频或新增 Compose 路径，不用 runBlocking(Dispatchers.Main)。新增翻译/复数/限定符验证双端选择替换，校验任务不生成平台副本，访问器/打包交官方插件。
-- Kotlin 可见性按实际访问需求收窄，优先使用 private；gkd-app 模块禁止使用 internal 关键字，需要跨文件或类访问的声明使用默认 public，其他模块允许 internal。仅为公开属性收窄可见性/可变性的 `_xxx` 字段改用 Explicit Backing Fields；普通私有缓存、生成命名及 Lambda `_` 不受限。避免循环静态初始化。
+- Kotlin 可见性按实际访问需求收窄，优先使用 private；cyanskip-app 模块禁止使用 internal 关键字，需要跨文件或类访问的声明使用默认 public，其他模块允许 internal。仅为公开属性收窄可见性/可变性的 `_xxx` 字段改用 Explicit Backing Fields；普通私有缓存、生成命名及 Lambda `_` 不受限。避免循环静态初始化。
 - 工具按职责组织并优先沿用邻近代码风格；无状态工具可用顶级函数，有共享状态或明确命名空间需求时使用 object，不为形式新增包装。XxxExt.kt 只放扩展，普通工具放职责明确的文件；不借规范调整进行无关重构。
-- 跨文件/页面复用 UI 统一 `Gk` + PascalCase，名称描述用途，禁用 Perf/Custom 泛化前缀。单组件文件同名，组件族及配套声明可同文件，文件以 Gk 开头并描述组件族；配置用 GkAbcDefaults/Colors，图标用 GkIcon/GkIcons。页面、私有 Composable、Preview、工具、Modifier 扩展、独立状态及其 Render() 不强制此前缀。
+- 跨文件/页面复用 UI 统一 `Cs` + PascalCase，名称描述用途，禁用 Perf/Custom 泛化前缀。单组件文件同名，组件族及配套声明可同文件，文件以 Cs 开头并描述组件族；配置用 CsAbcDefaults/Colors，图标用 CsIcon/CsIcons。页面、私有 Composable、Preview、工具、Modifier 扩展、独立状态及其 Render() 不强制此前缀。
 
 ## Desktop 运行时
 
@@ -70,16 +81,15 @@
 
 ## 验证与 Git
 
-- 按改动做最小必要验证：共享逻辑/UI、Desktop 只执行对应 JVM 编译及相关业务测试，不因 commonMain 或文档含双端命令追加 Android。仅 Android 实现、资源、Manifest、AIDL、隐藏 API、依赖/构建链路、专项规则或用户要求才做 Android 验证；默认仅 gkd 渠道，未经明确要求禁止 play。
-- UI 开发用 `./gradlew.bat :gkd-app:run`，构建前停止本任务启动的 Desktop JVM，避免覆盖运行中 JAR。网页使用版本目录 WebView2 和系统 Runtime。UI 默认使用对应编译及人工/HTTP 检查，不要求自动 UI 套件；仅为已发生、难以稳定人工复查的重要回归增加小范围自动测试，禁止仅复述静态布局或实现细节。业务状态机、持久化、事务恢复、协议/兼容测试保留，不按 ui 包名删除。
+- 按改动做最小必要验证：共享逻辑/UI、Desktop 只执行对应 JVM 编译及相关业务测试，不因 commonMain 或文档含双端命令追加 Android。仅 Android 实现、资源、Manifest、AIDL、隐藏 API、依赖/构建链路、专项规则或用户要求才做 Android 验证；默认使用 debug 变体，Release 需要 `CYANSKIP_STORE_FILE` 等签名属性，未配置时回退 debug 签名。
+- UI 开发用 `./gradlew.bat :cyanskip-app:run`，构建前停止本任务启动的 Desktop JVM，避免覆盖运行中 JAR。网页使用版本目录 WebView2 和系统 Runtime。UI 默认使用对应编译及人工/HTTP 检查，不要求自动 UI 套件；仅为已发生、难以稳定人工复查的重要回归增加小范围自动测试，禁止仅复述静态布局或实现细节。业务状态机、持久化、事务恢复、协议/兼容测试保留，不按 ui 包名删除。
 - 新测试说明输入、预期及回归，优先边界/异常/兼容行为；存储测试验证实际读写恢复，不仅路径。测试遵循生产生命周期，可用独立会话和构造依赖实现隔离；全局单例的集成测试复用一次真实应用生命周期及隔离存储。禁止为测试拆散生产逻辑、扩大可见性、增加专用 API、ViewModel、嵌套 Store 或生产重置/替换接口；不以逐类工厂、fork 或 ClassLoader 掩盖生命周期缺陷。
 - 不测试枚举/常量集合、连续编号、同注册表推导关系或类型系统保证的静态声明；外部协议/持久化/跨版本标识例外，名称或注释说明保护的契约。
-- Android 权限、IME、系统栏、预测返回、无障碍/Service 按需 adb 验证。真机/模拟器交互前记录自动化开关与运行模式，关闭 enableAutomator 并退出自动化模式，核对后再检查；finally 在成功/失败/中断后仅恢复本次字段并核对，不用旧整份配置覆盖。仅 Desktop 检查不改真机。
+- Android 权限、IME、系统栏、预测返回、无障碍/Service 按需 adb 验证。真机/模拟器交互前记录 enableMatch，临时关闭规则匹配并核对后再检查；finally 在成功/失败/中断后仅恢复本次字段并核对，不用旧整份配置覆盖。已删除自动化工作模式，不读写旧模式字段。仅 Desktop 检查不改真机。
 - 用户仅要求提交/推送时，只做轻量核对及 Git 操作；未经明确要求，不扩展为深度审查、临时 worktree 验证、全量构建/测试、Release Gate 或发布检查。
 
 ## 依赖与 Android 专项
 
 - 外部 npm 依赖/版本集中根 package.json，private 子包所有 dependencies/devDependencies/optionalDependencies/peerDependencies 仅用 workspace:。可发布子包自行声明独立安装所需运行时/optional/peer 依赖，公共开发工具仍在根；变更同步清单和 pnpm 锁文件。
 - Android framework Java/AIDL 源码定位、跨版本签名/可用性、缺失分析及 Java hidden-API 生成必须使用 [android-api-diff skill](.agents/skills/android-api-diff/SKILL.md) 与其 CLI，保留默认 JSON，不自行模拟版本检查。安装/更新 skill 在根执行 `android-api-diff skill install`。
-- 修改隐藏接口/父类实现、系统回调、remap 或相关模块依赖/R8 配置，以及排查相关混淆 Release 故障时，必须使用 [android-hidden-api-r8 skill](.agents/skills/android-hidden-api-r8/SKILL.md)。检查最终应用模块 `gkd-android` 的实际 R8 输入及优化后的运行时契约，不以源码 override、编译成功或 Debug 正常代替；`gkd-app` 可见的 `gkd-hidden-api` stub 不代表最终 R8 可见。默认仅验证受影响的 gkd Release 路径，未经用户要求或证据支持不扩大审计范围。
-- 特权进程 UserService 的可能失败 Binder 方法在最外层末端 `catch (e: Throwable)` 捕获可恢复错误，通过 Binder 可传输异常/结果保留原类型、消息、堆栈；不只在主进程捕获，不让 NoSuchMethodError 等 LinkageError 逃逸崩溃。VirtualMachineError/ThreadDeath 等终止错误可原样抛出，不伪装普通失败。
+- 修改隐藏接口/父类实现、系统回调、remap 或相关模块依赖/R8 配置，以及排查相关混淆 Release 故障时，必须使用 [android-hidden-api-r8 skill](.agents/skills/android-hidden-api-r8/SKILL.md)。检查最终应用模块 `cyanskip-android` 的实际 R8 输入及优化后的运行时契约，不以源码 override、编译成功或 Debug 正常代替；`cyanskip-app` 可见的 `cyanskip-hidden-api` stub 不代表最终 R8 可见。默认仅验证受影响的 cyanskip Release 路径，未经用户要求或证据支持不扩大审计范围。
