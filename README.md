@@ -51,6 +51,8 @@
 
 APK 输出到 `cyanskip-android/build/outputs/apk/`；本地交付包放在 `.local/dist/`（只保留当前版本，重新构建前删掉旧包）。Release 未配置 `CYANSKIP_STORE_FILE` 等签名属性时回退使用调试签名。桌面开发宿主、HTTP 调试与验证方式见[开发宿主说明](cyanskip-app/README.md)。
 
+GitHub Actions 可自动构建并发布签名 APK 与 SHA-256 校验文件；首次签名配置、发布触发方式和网站下载入口见 [GitHub 构建与发布](docs/github-releases.md)。
+
 ## 文档
 
 - [青跳开发版说明](docs/lite.md)

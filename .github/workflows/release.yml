@@ -1,0 +1,99 @@
+name: Build and publish cyan-skip
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cyan-skip-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-37 build-tools;37.0.0'
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Restore signing key
+        env:
+          CYANSKIP_STORE_FILE_BASE64: ${{ secrets.CYANSKIP_STORE_FILE_BASE64 }}
+          CYANSKIP_STORE_PASSWORD: ${{ secrets.CYANSKIP_STORE_PASSWORD }}
+          CYANSKIP_KEY_ALIAS: ${{ secrets.CYANSKIP_KEY_ALIAS }}
+          CYANSKIP_KEY_PASSWORD: ${{ secrets.CYANSKIP_KEY_PASSWORD }}
+        run: |
+          : "${CYANSKIP_STORE_FILE_BASE64:?Missing signing key secret}"
+          : "${CYANSKIP_STORE_PASSWORD:?Missing keystore password secret}"
+          : "${CYANSKIP_KEY_ALIAS:?Missing signing alias secret}"
+          : "${CYANSKIP_KEY_PASSWORD:?Missing key password secret}"
+          printf '%s' "$CYANSKIP_STORE_FILE_BASE64" | base64 --decode > "$RUNNER_TEMP/cyanskip.keystore"
+          chmod 600 "$RUNNER_TEMP/cyanskip.keystore"
+
+      - name: Test and build signed Release
+        env:
+          CYANSKIP_STORE_FILE: ${{ runner.temp }}/cyanskip.keystore
+          CYANSKIP_STORE_PASSWORD: ${{ secrets.CYANSKIP_STORE_PASSWORD }}
+          CYANSKIP_KEY_ALIAS: ${{ secrets.CYANSKIP_KEY_ALIAS }}
+          CYANSKIP_KEY_PASSWORD: ${{ secrets.CYANSKIP_KEY_PASSWORD }}
+          CYANSKIP_RENAME_PACKAGE_FLAG: '1'
+        run: |
+          chmod +x gradlew
+          ./gradlew :cyanskip-app:jvmTest :cyanskip-android:assembleRelease --console=plain
+
+      - name: Verify APK and prepare release
+        id: release
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("cyanskip-android/build/outputs/apk/release/output-metadata.json"))["elements"][0]["versionName"])')
+          apk="cyanskip-android/build/outputs/apk/release/cyan-skip-v${version}.apk"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$apk"
+          (cd "$(dirname "$apk")" && sha256sum "$(basename "$apk")" > "$(basename "$apk").sha256")
+          tag="build-${GITHUB_SHA:0:7}"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            [[ "$GITHUB_REF_NAME" == "v${version}" ]] || { echo 'Tag does not match the application version'; exit 1; }
+            tag="$GITHUB_REF_NAME"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "apk=$apk" >> "$GITHUB_OUTPUT"
+          printf '%s\n\n' "Android 8.0 以上；arm64-v8a / x86_64。" > "$RUNNER_TEMP/release-notes.md"
+          printf '%s\n\n' "应用 ID 为 app.cyanskip.android；旧版 app.qingtiao.android 的数据不会迁移，首次使用需重新配置规则和权限。" >> "$RUNNER_TEMP/release-notes.md"
+          printf '%s\n' "源码提交：${GITHUB_SHA}" >> "$RUNNER_TEMP/release-notes.md"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_APK: ${{ steps.release.outputs.apk }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "$RELEASE_APK" "$RELEASE_APK.sha256" \
+              --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "cyan-skip v${RELEASE_VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+          fi
+
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/cyanskip.keystore"
